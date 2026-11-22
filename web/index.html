@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HandControl</title>
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #fff; --text: #1b1d21; --muted: #6b7280; --line: #e3e5ea;
+  --accent: #3b6cf6; --accent-text: #fff; --good: #18864b; --bad: #c0392b; --warn-bg: #fff4d6; --warn-text: #7a5600;
+  --field: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #131417; --panel: #1c1e23; --text: #e8eaee; --muted: #9aa1ad; --line: #2c2f36;
+    --accent: #6b8fff; --accent-text: #0d1020; --good: #4ecb85; --bad: #ff7b6b; --warn-bg: #3a3013; --warn-text: #f3d37a; --field: #24272e; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+[hidden] { display: none !important; }
+h1 { font-size: 18px; margin: 0 8px 0 0; }
+.pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill.ok { color: var(--good); } .pill.bad { color: var(--bad); border-color: var(--bad); }
+.spacer { flex: 1; }
+button, select, input { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.icon { padding: 4px 8px; color: var(--muted); }
+input[type=text], input[type=number], select { border: 1px solid var(--line); background: var(--field); border-radius: 8px; padding: 6px 8px; min-width: 0; }
+input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+main { display: grid; grid-template-columns: minmax(280px, 400px) minmax(0, 1fr); gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; align-items: start; }
+@media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; position: sticky; top: 16px; }
+@media (max-width: 860px) { .side { position: static; } }
+.preview { position: relative; aspect-ratio: 4/3; background: #000; border-radius: 8px; overflow: hidden; }
+.preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.preview .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; color: #fff; background: rgba(0,0,0,.75); }
+.preview .badge { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.65); color: #fff; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.now { margin-top: 12px; }
+.now .big { font-size: 20px; font-weight: 600; min-height: 29px; }
+.bar { height: 5px; background: var(--line); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.bar div { height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+.muted { color: var(--muted); } .small { font-size: 12px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
+.log { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; font-size: 13px; }
+.log li { padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; } .log li:last-child { border: 0; }
+.log .fail { color: var(--bad); }
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+.tabs button { border: 0; background: none; padding: 8px 14px; border-radius: 8px; color: var(--muted); font-weight: 600; }
+.tabs button.active { background: var(--bg); color: var(--text); }
+.row { display: grid; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.row.gesture { grid-template-columns: 20px minmax(150px, 1.2fr) 90px minmax(130px, .9fr) minmax(140px, 1.3fr) auto; }
+.row.voice { grid-template-columns: 20px minmax(150px, 1.2fr) minmax(130px, .9fr) minmax(140px, 1.3fr) auto; }
+.row.off > :not(:first-child):not(.tools) { opacity: .45; }
+.row .value { display: flex; gap: 6px; } .row .value > :first-child { flex: 1; }
+.row .tools { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.row label.rep { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; }
+@media (max-width: 1300px) { .row.gesture, .row.voice { grid-template-columns: 20px minmax(0, 1fr) minmax(0, 1fr); } .row .atype { grid-column: 2; } .row .phrase { grid-column: 2 / -1; } .row .tools { grid-column: 2 / -1; justify-content: flex-start; } }
+.add { margin-top: 12px; }
+.note { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.settings { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 12px 16px; align-items: center; }
+.settings .hint { grid-column: 2; margin-top: -8px; }
+@media (max-width: 600px) { .settings { grid-template-columns: 1fr; } .settings .hint { grid-column: 1; } }
+.pose { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pose input { flex: 1; }
+.recorder { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+#saved { font-size: 12px; color: var(--muted); min-width: 50px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>✋ HandControl</h1>
+  <span class="pill" id="pCam">Camera</span>
+  <span class="pill" id="pVoice">Voice</span>
+  <span class="pill" id="pAx">Keyboard control</span>
+  <span class="spacer"></span>
+  <span id="saved"></span>
+  <button id="bMouse" title="Move the cursor with your index finger; pinch to click">Mouse mode</button>
+  <button id="bPause" class="primary">Pause gestures</button>
+</header>
+<main>
+  <div class="side">
+    <div class="panel">
+      <div class="preview">
+        <img id="cam" alt="Live camera preview with detected hand">
+        <div class="badge" id="badge" hidden></div>
+        <div class="msg" id="camMsg">Starting camera…</div>
+      </div>
+      <div class="now">
+        <div class="muted small">Detected right now</div>
+        <div class="big" id="nowGesture">—</div>
+        <div class="bar"><div id="hold"></div></div>
+      </div>
+      <div class="now">
+        <div class="muted small">Last thing heard</div>
+        <div id="heard">—</div>
+        <div class="muted small" id="voiceHint"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Activity</h2>
+      <ul class="log" id="log"><li class="muted">Nothing yet. Make a gesture or say a command.</li></ul>
+    </div>
+  </div>
+  <div class="panel">
+    <div id="axNote" class="note" hidden>
+      macOS is blocking keystrokes and clicks from HandControl. Open <b>System Settings → Privacy &amp; Security → Accessibility</b>,
+      turn on the app you started HandControl from (for example Terminal), then restart HandControl.
+    </div>
+    <div class="tabs" role="tablist">
+      <button data-tab="gestures" class="active">Hand gestures</button>
+      <button data-tab="voice">Voice commands</button>
+      <button data-tab="poses">Custom poses</button>
+      <button data-tab="settings">Settings</button>
+    </div>
+    <section id="tab-gestures">
+      <p class="muted">Hold a pose still for a moment, or swipe with an open hand, to trigger its action.</p>
+      <div id="bindings"></div>
+      <button class="add" id="addBinding">+ Add gesture</button>
+    </section>
+    <section id="tab-voice" hidden>
+      <div id="voiceNote" class="note" hidden></div>
+      <p class="muted" id="voiceIntro"></p>
+      <div id="voiceRows"></div>
+      <button class="add" id="addVoice">+ Add voice command</button>
+    </section>
+    <section id="tab-poses" hidden>
+      <p class="muted">Teach HandControl your own hand shape, then use it like any built-in gesture. A custom pose wins when it also looks like a built-in one.</p>
+      <div id="poses"></div>
+      <div class="recorder">
+        <input type="text" id="poseName" placeholder="Name, e.g. Spock" maxlength="40" aria-label="New pose name">
+        <button class="primary" id="recPose">Record pose</button>
+        <span id="recMsg" class="muted"></span>
+      </div>
+    </section>
+    <section id="tab-settings" hidden>
+      <div class="settings" id="settings"></div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  for (const k of kids) n.append(k);
+  return n;
+};
+let cfg, GESTURES = [], INTERNAL = {}, status = null, saveTimer = null, saving = Promise.resolve();
+
+const ACTION_TYPES = [
+  ['key', 'Press keys'], ['media', 'Media & volume'], ['text', 'Type text'], ['scroll', 'Scroll'],
+  ['click', 'Mouse click'], ['open_app', 'Open app'], ['open_url', 'Open website'],
+  ['shell', 'Run shell command'], ['internal', 'HandControl'],
+];
+const CHOICES = {
+  media: [['volume_up', 'Volume up'], ['volume_down', 'Volume down'], ['mute', 'Mute'], ['play_pause', 'Play / pause'], ['next_track', 'Next track'], ['prev_track', 'Previous track']],
+  scroll: [['3', 'Up'], ['-3', 'Down'], ['10', 'Up fast'], ['-10', 'Down fast']],
+  click: [['left', 'Left click'], ['right', 'Right click'], ['double', 'Double click']],
+};
+const PLACEHOLDER = { key: 'e.g. cmd+shift+t or right', text: 'Text to type', open_app: 'App name, e.g. Safari', open_url: 'e.g. youtube.com', shell: 'Command to run' };
+
+async function post(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('Request failed (' + r.status + ')');
+  return r.json();
+}
+function save() {
+  clearTimeout(saveTimer);
+  $('saved').textContent = '';
+  saveTimer = setTimeout(flush, 400);
+}
+function flush() {
+  clearTimeout(saveTimer); saveTimer = null;
+  saving = saving.then(() => post('/api/config', cfg))
+    .then(() => { $('saved').textContent = 'Saved'; })
+    .catch(e => { $('saved').textContent = 'Not saved: ' + e.message; });
+  return saving;
+}
+const uid = () => Math.random().toString(16).slice(2, 10);
+
+function select(options, value, onchange, label) {
+  const s = el('select', { ariaLabel: label });
+  for (const [v, text] of options) s.append(el('option', { value: v, textContent: text }));
+  if (!options.some(o => o[0] === value)) s.append(el('option', { value, textContent: value ? '(missing) ' + value : 'Choose…' }));
+  s.value = value;
+  s.onchange = () => onchange(s.value);
+  return s;
+}
+function gestureOptions() {
+  return [
+    ...GESTURES.map(g => [g.id, g.emoji + ' ' + g.label]),
+    ...cfg.custom_poses.map(p => ['custom:' + p.id, '★ ' + p.name]),
+  ];
+}
+
+// Type picker + value editor for one action. Calls rerender when the type changes.
+function actionEditor(action, rerender) {
+  const type = select(ACTION_TYPES, action.type, v => {
+    action.type = v;
+    action.value = CHOICES[v] ? CHOICES[v][0][0] : v === 'internal' ? Object.keys(INTERNAL)[0] : '';
+    save(); rerender();
+  }, 'Action type');
+  type.className = 'atype';
+  const value = el('div', { className: 'value' });
+  const choices = action.type === 'internal' ? Object.entries(INTERNAL) : CHOICES[action.type];
+  if (choices) {
+    value.append(select(choices, action.value, v => { action.value = v; save(); }, 'Action'));
+  } else {
+    const input = el('input', { type: 'text', value: action.value, placeholder: PLACEHOLDER[action.type] || '', ariaLabel: 'Action value' });
+    input.oninput = () => { action.value = input.value; save(); };
+    value.append(input);
+    if (action.type === 'key') {
+      const rec = el('button', { textContent: 'Record', title: 'Press the shortcut on your keyboard' });
+      rec.onclick = () => {
+        rec.textContent = 'Press keys…';
+        const onKey = e => {
+          if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return;
+          e.preventDefault(); e.stopPropagation();
+          window.removeEventListener('keydown', onKey, true);
+          rec.textContent = 'Record';
+          const combo = comboFrom(e);
+          if (combo) { action.value = input.value = combo; save(); }
+        };
+        window.addEventListener('keydown', onKey, true);
+      };
+      value.append(rec);
+    }
+  }
+  return [type, value];
+}
+function comboFrom(e) {
+  const named = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'enter', Escape: 'esc', ' ': 'space', Tab: 'tab', Backspace: 'backspace', Delete: 'delete', Home: 'home', End: 'end', PageUp: 'pageup', PageDown: 'pagedown' };
+  let key = named[e.key];
+  if (!key && /^Key[A-Z]$/.test(e.code)) key = e.code.slice(3).toLowerCase();
+  if (!key && /^Digit\d$/.test(e.code)) key = e.code.slice(5);
+  if (!key && /^F\d{1,2}$/.test(e.key)) key = e.key.toLowerCase();
+  if (!key && e.key.length === 1 && e.key !== '+') key = e.key.toLowerCase();
+  if (!key) return '';
+  return [e.metaKey && 'cmd', e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', key].filter(Boolean).join('+');
+}
+function rowTools(item, list, rerender, extra) {
+  const test = el('button', { textContent: 'Test', title: 'Run this action now' });
+  test.onclick = () => post('/api/test', { action: item.action }).catch(() => {});
+  const del = el('button', { className: 'icon', textContent: '✕', title: 'Remove', ariaLabel: 'Remove' });
+  del.onclick = () => { list.splice(list.indexOf(item), 1); save(); rerender(); };
+  return el('div', { className: 'tools' }, ...(extra || []), test, del);
+}
+function enabledBox(item, row) {
+  const c = el('input', { type: 'checkbox', checked: item.enabled, title: 'Enabled', ariaLabel: 'Enabled' });
+  c.onchange = () => { item.enabled = c.checked; row.classList.toggle('off', !c.checked); save(); };
+  return c;
+}
+
+function renderBindings() {
+  const box = $('bindings'); box.replaceChildren();
+  if (!cfg.bindings.length) box.append(el('p', { className: 'muted', textContent: 'No gestures set up yet.' }));
+  for (const b of cfg.bindings) {
+    const row = el('div', { className: 'row gesture' + (b.enabled ? '' : ' off') });
+    const rep = el('label', { className: 'rep', title: 'Keep firing while the pose is held (good for volume or scrolling)' });
+    const repBox = el('input', { type: 'checkbox', checked: b.repeat });
+    repBox.onchange = () => { b.repeat = repBox.checked; save(); };
+    rep.append(repBox, 'Repeat');
+    row.append(
+      enabledBox(b, row),
+      select(gestureOptions(), b.gesture, v => { b.gesture = v; save(); }, 'Gesture'),
+      select([['any', 'Either hand'], ['Left', 'Left hand'], ['Right', 'Right hand']], b.hand, v => { b.hand = v; save(); }, 'Hand'),
+      ...actionEditor(b.action, renderBindings),
+      rowTools(b, cfg.bindings, renderBindings, [rep]),
+    );
+    box.append(row);
+  }
+}
+function renderVoice() {
+  const box = $('voiceRows'); box.replaceChildren();
+  const wake = cfg.settings.wake_word.trim();
+  $('voiceIntro').textContent = wake
+    ? `Say “${wake}” and then a command, for example “${wake}, ${cfg.voice[0] ? cfg.voice[0].phrase : 'next slide'}”. You can change or remove the wake word in Settings.`
+    : 'Say a command at any time. Add a wake word in Settings if commands fire by accident.';
+  if (!cfg.voice.length) box.append(el('p', { className: 'muted', textContent: 'No voice commands yet.' }));
+  for (const v of cfg.voice) {
+    const row = el('div', { className: 'row voice' + (v.enabled ? '' : ' off') });
+    const phrase = el('input', { className: 'phrase', type: 'text', value: v.phrase, placeholder: 'What you say', maxLength: 80, ariaLabel: 'Phrase' });
+    phrase.oninput = () => { v.phrase = phrase.value; save(); };
+    row.append(enabledBox(v, row), phrase, ...actionEditor(v.action, renderVoice), rowTools(v, cfg.voice, renderVoice));
+    box.append(row);
+  }
+}
+function renderPoses() {
+  const box = $('poses'); box.replaceChildren();
+  if (!cfg.custom_poses.length) box.append(el('p', { className: 'muted', textContent: 'No custom poses yet.' }));
+  for (const p of cfg.custom_poses) {
+    const name = el('input', { type: 'text', value: p.name, maxLength: 40, ariaLabel: 'Pose name' });
+    name.oninput = () => { p.name = name.value; save(); };
+    name.onchange = renderBindings;
+    const del = el('button', { className: 'icon', textContent: '✕', title: 'Delete pose and the gestures that use it', ariaLabel: 'Delete pose' });
+    del.onclick = () => {
+      cfg.custom_poses.splice(cfg.custom_poses.indexOf(p), 1);
+      cfg.bindings = cfg.bindings.filter(b => b.gesture !== 'custom:' + p.id);
+      save(); renderPoses(); renderBindings();
+    };
+    box.append(el('div', { className: 'pose' }, '★', name, del));
+  }
+}
+const SETTINGS = [
+  ['voice_enabled', 'Voice commands', 'bool', 'Listens through your microphone. Speech is recognised on this computer and never sent anywhere.'],
+  ['wake_word', 'Wake word', 'text', 'Say this before each command. Leave empty to react to commands directly.'],
+  ['start_paused', 'Start with gestures paused', 'bool', 'Useful with voice: say the wake word and “start hand control” when you want gestures on.'],
+  ['hold_ms', 'Hold time before a pose triggers (ms)', 'number', 'Longer means fewer accidental triggers.'],
+  ['repeat_ms', 'Repeat interval while held (ms)', 'number', 'For gestures with Repeat ticked.'],
+  ['swipe_distance', 'Swipe distance (fraction of the frame)', 'number', 'Smaller is more sensitive. 0.22 is about a quarter of the picture.'],
+  ['swipe_cooldown_ms', 'Pause after a swipe (ms)', 'number', 'Stops the hand moving back from counting as a second swipe.'],
+  ['swipe_open_hand_only', 'Swipes need an open hand', 'bool', 'Turn off to swipe with any hand shape.'],
+  ['pose_tolerance', 'Custom pose tolerance', 'number', 'How far any one joint may be off, in palm lengths. Higher matches custom poses more loosely.'],
+  ['mouse_smoothing', 'Mouse smoothing (0 to 0.95)', 'number', 'Higher is steadier but slower to follow.'],
+  ['camera_index', 'Camera number', 'number', '0 is usually the built-in camera.'],
+];
+function renderSettings() {
+  const box = $('settings'); box.replaceChildren();
+  for (const [key, label, kind, hint] of SETTINGS) {
+    const id = 'set_' + key;
+    let input;
+    if (kind === 'bool') {
+      input = el('input', { type: 'checkbox', id, checked: cfg.settings[key] });
+      input.onchange = () => { cfg.settings[key] = input.checked; save(); renderVoice(); };
+    } else {
+      input = el('input', { type: kind, id, value: cfg.settings[key] });
+      if (kind === 'number') input.step = 'any';
+      input.style.maxWidth = '220px';
+      input.oninput = () => {
+        if (kind === 'number') { if (input.value === '' || isNaN(+input.value)) return; cfg.settings[key] = +input.value; }
+        else cfg.settings[key] = input.value;
+        save(); renderVoice();
+      };
+    }
+    box.append(el('label', { htmlFor: id, textContent: label }), el('div', {}, input), el('div', { className: 'hint muted small', textContent: hint }));
+  }
+}
+function renderAll() { renderBindings(); renderVoice(); renderPoses(); renderSettings(); }
+
+for (const tab of document.querySelectorAll('.tabs button')) tab.onclick = () => showTab(tab.dataset.tab);
+function showTab(name) {
+  for (const t of document.querySelectorAll('.tabs button')) t.classList.toggle('active', t.dataset.tab === name);
+  for (const s of document.querySelectorAll('section[id^=tab-]')) s.hidden = s.id !== 'tab-' + name;
+}
+$('addBinding').onclick = () => {
+  cfg.bindings.push({ id: uid(), gesture: 'open_palm', hand: 'any', action: { type: 'key', value: '' }, repeat: false, enabled: true });
+  save(); renderBindings();
+};
+$('addVoice').onclick = () => {
+  cfg.voice.push({ id: uid(), phrase: '', action: { type: 'key', value: '' }, enabled: true });
+  save(); renderVoice();
+  $('voiceRows').lastChild.querySelector('input[type=text]').focus();
+};
+$('recPose').onclick = async () => {
+  const btn = $('recPose'), msg = $('recMsg');
+  btn.disabled = true;
+  try {
+    for (let n = 3; n > 0; n--) { msg.textContent = `Get your hand in position… ${n}`; await new Promise(r => setTimeout(r, 1000)); }
+    msg.textContent = 'Hold still…';
+    await flush();
+    const res = await post('/api/record_pose', { name: $('poseName').value.trim() || 'Custom pose' });
+    if (!res.ok) { msg.textContent = res.error; return; }
+    cfg = res.config;
+    cfg.bindings.push({ id: uid(), gesture: 'custom:' + res.id, hand: 'any', action: { type: 'key', value: '' }, repeat: false, enabled: true });
+    save(); renderAll();
+    $('poseName').value = '';
+    msg.textContent = 'Saved. Pick what it does under Hand gestures (added at the bottom).';
+  } catch (e) { msg.textContent = 'Recording failed: ' + e.message; }
+  finally { btn.disabled = false; }
+};
+$('bPause').onclick = () => post('/api/control', { paused: !(status && status.paused) }).then(applyStatus);
+$('bMouse').onclick = () => post('/api/control', { mouse_mode: !(status && status.mouse_mode) }).then(applyStatus);
+
+function pill(node, text, state) { node.textContent = text; node.className = 'pill ' + (state || ''); }
+function applyStatus(s) {
+  status = s;
+  $('bPause').textContent = s.paused ? 'Resume gestures' : 'Pause gestures';
+  $('bMouse').classList.toggle('on', s.mouse_mode);
+  $('bMouse').textContent = s.mouse_mode ? 'Mouse mode: on' : 'Mouse mode';
+  pill($('pCam'), s.camera_error ? 'Camera unavailable' : `Camera on · ${s.fps} fps`, s.camera_error ? 'bad' : 'ok');
+  const v = s.voice;
+  const vText = { off: 'Voice off', loading: 'Voice loading…', mic: 'Voice: waiting for microphone access', listening: v.armed ? 'Voice: go ahead…' : 'Voice listening', error: 'Voice problem' }[v.state];
+  pill($('pVoice'), vText, v.state === 'listening' ? 'ok' : v.state === 'error' ? 'bad' : '');
+  $('pVoice').title = v.error || '';
+  pill($('pAx'), s.accessibility ? 'Keyboard control allowed' : 'Keyboard control blocked', s.accessibility ? 'ok' : 'bad');
+  $('axNote').hidden = s.accessibility;
+  $('camMsg').hidden = !s.camera_error; $('camMsg').textContent = s.camera_error;
+  const badge = s.paused ? 'PAUSED' : s.mouse_mode ? 'MOUSE MODE' : '';
+  $('badge').hidden = !badge; $('badge').textContent = badge;
+  const h = s.hand;
+  $('nowGesture').textContent = !h ? 'No hand in view' : (h.name || 'Hand (no known gesture)') + ` · ${h.label.toLowerCase()} hand`;
+  $('hold').style.width = (h && h.gesture ? h.progress * 100 : 0) + '%';
+  $('heard').textContent = v.heard ? `“${v.heard}”` : '—';
+  $('voiceHint').textContent = v.state === 'error' ? v.error : '';
+  const notes = [];
+  if (v.state === 'error') notes.push(v.error);
+  if (v.unknown.length) notes.push(`The voice engine doesn't know: ${v.unknown.join(', ')}. Commands using these words are skipped; try everyday English words.`);
+  $('voiceNote').hidden = !notes.length; $('voiceNote').textContent = notes.join(' ');
+  if (s.events.length) {
+    $('log').replaceChildren(...s.events.map(e => {
+      const icon = { gesture: '✋', voice: '🎙️', test: '🧪' }[e.source] || '';
+      const time = new Date(e.t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return el('li', { className: e.ok ? '' : 'fail' }, `${icon} ${e.trigger} → ${e.text} `, el('span', { className: 'muted small', textContent: time }));
+    }));
+  }
+}
+let lost = false, camAt = 0;
+function connectCam() { camAt = Date.now(); $('cam').src = '/stream?' + camAt; }
+async function poll() {
+  try {
+    applyStatus(await (await fetch('/api/status')).json());
+    // Reconnect the video after a restart, or if it never delivered a frame.
+    if (lost || (!status.camera_error && !$('cam').naturalWidth && Date.now() - camAt > 2000)) connectCam();
+    lost = false;
+  } catch { lost = true; pill($('pCam'), 'HandControl is not running', 'bad'); }
+  setTimeout(poll, 300);
+}
+(async () => {
+  const data = await (await fetch('/api/config')).json();
+  cfg = data.config; GESTURES = data.gestures; INTERNAL = data.internal;
+  renderAll();
+  connectCam();
+  poll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+mediapipe==1.2.2
+opencv-python==5.0.0.93
+pynput==1.8.2
+pyobjc-framework-ApplicationServices==13.0
+pyobjc-framework-Quartz==13.0
+sounddevice==0.5.6
+vosk==0.3.44
